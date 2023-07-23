@@ -103,6 +103,7 @@ struct ioring_options {
 	unsigned int apptag_mask;
 	unsigned int prchk;
 	char *pi_chk;
+	unsigned int zone_append;
 	enum uring_cmd_type cmd_type;
 };
 
@@ -285,6 +286,15 @@ static struct fio_option options[] = {
 		.group	= FIO_OPT_G_IOURING,
 	},
 	{
+		.name = "zone_append",
+                .lname = "ZNS zone append",
+                .type = FIO_OPT_BOOL,
+                .off1   = offsetof(struct ioring_options, zone_append),
+                .help   = "Use zone appends for ZNS",
+                .category = FIO_OPT_C_ENGINE,
+                .group  = FIO_OPT_G_IOURING,
+        },
+	{
 		.name	= NULL,
 	},
 };
@@ -430,6 +440,10 @@ static int fio_ioring_cmd_prep(struct thread_data *td, struct io_u *io_u)
 		sqe->uring_cmd_flags = IORING_URING_CMD_FIXED;
 		sqe->buf_index = io_u->index;
 	}
+
+	if (o->zone_append && io_u->ddir == DDIR_WRITE) {
+        	io_u->ddir = DDIR_APPEND;
+        }
 
 	cmd = (struct nvme_uring_cmd *)sqe->cmd;
 	return fio_nvme_uring_cmd_prep(cmd, io_u,

@@ -14,6 +14,8 @@ enum fio_ddir {
 
 	DDIR_RWDIR_CNT = 3,
 	DDIR_RWDIR_SYNC_CNT = 4,
+
+	DDIR_APPEND = 8,
 };
 
 #define for_each_rw_ddir(ddir)	for (enum fio_ddir ddir = 0; ddir < DDIR_RWDIR_CNT; ddir++)
