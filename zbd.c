@@ -2094,6 +2094,8 @@ retry:
 			}
 
 			/*
+             * TODO: for our benchmark this would not be the case since writes are always to a different zone than the resets
+             *
 			 * Since previous write requests may have been submitted
 			 * asynchronously and since we will submit the zone
 			 * reset synchronously, wait until previously submitted

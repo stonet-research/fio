@@ -1457,6 +1457,7 @@ static void add_ddir_status_json(struct thread_stat *ts,
 	double mean, dev, iops;
 	struct json_object *dir_object, *tmp_object;
 	double p_of_agg = 100.0;
+    struct thread_data *global;
 
 	assert(ddir_rw(ddir) || ddir_sync(ddir));
 
@@ -1464,8 +1465,15 @@ static void add_ddir_status_json(struct thread_stat *ts,
 		return;
 
 	dir_object = json_create_object();
-	json_object_add_value_object(parent,
-		(ts->unified_rw_rep == UNIFIED_MIXED) ? "mixed" : io_ddir_name(ddir), dir_object);
+
+    global = get_global_options();
+    if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM) {
+        json_object_add_value_object(parent, "ZNS Reset", dir_object);
+        json_object_add_value_int(dir_object, "total_zone_resets", ts->nr_zone_resets);
+    } else {
+        json_object_add_value_object(parent,
+            (ts->unified_rw_rep == UNIFIED_MIXED) ? "mixed" : io_ddir_name(ddir), dir_object);
+    }
 
 	if (ddir_rw(ddir)) {
 		bw_bytes = 0;
@@ -1727,7 +1735,7 @@ static struct json_object *show_thread_status_json(struct thread_stat *ts,
 
 	add_ddir_status_json(ts, rs, DDIR_READ, root);
 	add_ddir_status_json(ts, rs, DDIR_WRITE, root);
-	add_ddir_status_json(ts, rs, DDIR_TRIM, root);
+    add_ddir_status_json(ts, rs, DDIR_TRIM, root);
 	add_ddir_status_json(ts, rs, DDIR_SYNC, root);
 
 	if (ts->unified_rw_rep == UNIFIED_BOTH)
@@ -1743,6 +1751,7 @@ static struct json_object *show_thread_status_json(struct thread_stat *ts,
 		usr_cpu = 0;
 		sys_cpu = 0;
 	}
+
 	json_object_add_value_int(root, "job_runtime", ts->total_run_time);
 	json_object_add_value_float(root, "usr_cpu", usr_cpu);
 	json_object_add_value_float(root, "sys_cpu", sys_cpu);
