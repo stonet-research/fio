@@ -23,6 +23,43 @@
 #include "pshared.h"
 #include "zbd.h"
 
+#define CMDPRIO_RWDIR_CNT 2
+
+struct cmdprio_options {
+	unsigned int percentage[CMDPRIO_RWDIR_CNT];
+	unsigned int class[CMDPRIO_RWDIR_CNT];
+	unsigned int level[CMDPRIO_RWDIR_CNT];
+	unsigned int hint[CMDPRIO_RWDIR_CNT];
+	char *bssplit_str;
+};
+
+enum uring_cmd_type {
+	FIO_URING_CMD_NVME = 1,
+};
+
+struct ioring_options {
+	struct thread_data *td;
+	unsigned int hipri;
+	struct cmdprio_options cmdprio_options;
+	unsigned int fixedbufs;
+	unsigned int registerfiles;
+	unsigned int sqpoll_thread;
+	unsigned int finish;
+	unsigned int sqpoll_set;
+	unsigned int sqpoll_cpu;
+	unsigned int nonvectored;
+	unsigned int uncached;
+	unsigned int nowait;
+	unsigned int force_async;
+	unsigned int md_per_io_size;
+	unsigned int pi_act;
+	unsigned int apptag;
+	unsigned int apptag_mask;
+	unsigned int prchk;
+	char *pi_chk;
+	enum uring_cmd_type cmd_type;
+};
+
 static bool is_valid_offset(const struct fio_file *f, uint64_t offset)
 {
 	return (uint64_t)(offset - f->file_offset) < f->io_size;
@@ -2227,11 +2264,27 @@ int zbd_do_io_u_trim(struct thread_data *td, struct io_u *io_u)
 {
 	struct fio_file *f = io_u->file;
 	struct fio_zone_info *z;
+	struct ioring_options *o = td->eo;
 	int ret;
 
 	z = zbd_offset_to_zone(f, io_u->offset);
 	if (!z->has_wp)
 		return 0;
+
+	if (o->finish) {
+		zone_lock(td, f, z);
+		pthread_mutex_lock(&f->zbd_info->mutex);
+		zbd_write_zone_put(td, f, z);
+		pthread_mutex_unlock(&f->zbd_info->mutex);
+		dprint(FD_ZBD,
+				"%s: finish zone %d\n",
+				f->file_name, zbd_zone_idx(f, z));
+		io_u_quiesce(td);
+		zbd_finish_zone(td, f, z);
+		zone_unlock(z);
+
+		return io_u_completed;
+	}
 
 	if (io_u->offset != z->start) {
 		log_err("Trim offset not at zone start (%lld)\n",

@@ -1448,9 +1448,23 @@ static struct json_object *add_ddir_lat_json(struct thread_stat *ts,
 	return lat_object;
 }
 
+static bool is_finish_set(struct flist_head *opt_list)
+{
+	struct flist_head *entry;
+	struct print_option *p;
+
+	flist_for_each(entry, opt_list) {
+		p = flist_entry(entry, struct print_option, list);
+		if (strcmp(p->name, "finish") && p->value && strcmp(p->value, "1"))
+			return true;
+	}
+
+	return false;
+}
+
 static void add_ddir_status_json(struct thread_stat *ts,
 				 struct group_run_stats *rs, enum fio_ddir ddir,
-				 struct json_object *parent)
+				 struct json_object *parent, struct flist_head *opt_list)
 {
 	unsigned long long min, max;
 	unsigned long long bw_bytes, bw;
@@ -1467,7 +1481,10 @@ static void add_ddir_status_json(struct thread_stat *ts,
 	dir_object = json_create_object();
 
     global = get_global_options();
-    if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM) {
+   if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM && is_finish_set(opt_list)) {
+        json_object_add_value_object(parent, "ZNS finish", dir_object);
+        json_object_add_value_int(dir_object, "total_zone_resets", ts->nr_zone_resets);
+    } else  if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM) {
         json_object_add_value_object(parent, "ZNS Reset", dir_object);
         json_object_add_value_int(dir_object, "total_zone_resets", ts->nr_zone_resets);
     } else {
@@ -1599,7 +1616,7 @@ static void add_mixed_ddir_status_json(struct thread_stat *ts,
 
 	/* add the aggregated stats to json parent */
 	if (ts_lcl)
-		add_ddir_status_json(ts_lcl, rs, DDIR_READ, parent);
+		add_ddir_status_json(ts_lcl, rs, DDIR_READ, parent, NULL);
 
 	free_clat_prio_stats(ts_lcl);
 	free(ts_lcl);
@@ -1733,10 +1750,10 @@ static struct json_object *show_thread_status_json(struct thread_stat *ts,
 	if (opt_list)
 		json_add_job_opts(root, "job options", opt_list);
 
-	add_ddir_status_json(ts, rs, DDIR_READ, root);
-	add_ddir_status_json(ts, rs, DDIR_WRITE, root);
-    add_ddir_status_json(ts, rs, DDIR_TRIM, root);
-	add_ddir_status_json(ts, rs, DDIR_SYNC, root);
+	add_ddir_status_json(ts, rs, DDIR_READ, root, NULL);
+	add_ddir_status_json(ts, rs, DDIR_WRITE, root, NULL);
+    add_ddir_status_json(ts, rs, DDIR_TRIM, root, opt_list);
+	add_ddir_status_json(ts, rs, DDIR_SYNC, root, NULL);
 
 	if (ts->unified_rw_rep == UNIFIED_BOTH)
 		add_mixed_ddir_status_json(ts, rs, root);

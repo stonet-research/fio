@@ -50,6 +50,7 @@ struct nvme_uring_cmd {
 
 #define NVME_ZNS_ZRA_REPORT_ZONES 0
 #define NVME_ZNS_ZRAS_FEAT_ERZ (1 << 16)
+#define NVME_ZNS_ZSA_FINISH 0x2
 #define NVME_ZNS_ZSA_RESET 0x4
 #define NVME_ZONE_TYPE_SEQWRITE_REQ 0x2
 
@@ -436,6 +437,9 @@ int fio_nvme_report_zones(struct thread_data *td, struct fio_file *f,
 			  unsigned int nr_zones);
 
 int fio_nvme_reset_wp(struct thread_data *td, struct fio_file *f,
+		      uint64_t offset, uint64_t length);
+
+int fio_nvme_finish_zone(struct thread_data *td, struct fio_file *f,
 		      uint64_t offset, uint64_t length);
 
 int fio_nvme_get_max_open_zones(struct thread_data *td, struct fio_file *f,

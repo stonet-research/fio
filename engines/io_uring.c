@@ -90,6 +90,7 @@ struct ioring_options {
 	unsigned int fixedbufs;
 	unsigned int registerfiles;
 	unsigned int sqpoll_thread;
+	unsigned int finish;
 	unsigned int sqpoll_set;
 	unsigned int sqpoll_cpu;
 	unsigned int nonvectored;
@@ -158,6 +159,15 @@ static struct fio_option options[] = {
 		.type	= FIO_OPT_STR_SET,
 		.off1	= offsetof(struct ioring_options, sqpoll_thread),
 		.help	= "Offload submission/completion to kernel thread",
+		.category = FIO_OPT_C_ENGINE,
+		.group	= FIO_OPT_G_IOURING,
+	},
+	{
+		.name	= "finish",
+		.lname	= "FINISH ZNS",
+		.type	= FIO_OPT_STR_SET,
+		.off1	= offsetof(struct ioring_options, finish),
+		.help	= "Issue FINISH Commands to ZNS device",
 		.category = FIO_OPT_C_ENGINE,
 		.group	= FIO_OPT_G_IOURING,
 	},
@@ -1388,6 +1398,12 @@ static int fio_ioring_cmd_reset_wp(struct thread_data *td, struct fio_file *f,
 	return fio_nvme_reset_wp(td, f, offset, length);
 }
 
+static int fio_ioring_cmd_finish_zone(struct thread_data *td, struct fio_file *f,
+				   uint64_t offset, uint64_t length)
+{
+	return fio_nvme_finish_zone(td, f, offset, length);
+}
+
 static int fio_ioring_cmd_get_max_open_zones(struct thread_data *td,
 					     struct fio_file *f,
 					     unsigned int *max_open_zones)
@@ -1460,6 +1476,7 @@ static struct ioengine_ops ioengine_uring_cmd = {
 	.get_zoned_model	= fio_ioring_cmd_get_zoned_model,
 	.report_zones		= fio_ioring_cmd_report_zones,
 	.reset_wp		= fio_ioring_cmd_reset_wp,
+	.finish_zone = fio_ioring_cmd_finish_zone,
 	.get_max_open_zones	= fio_ioring_cmd_get_max_open_zones,
 	.options		= options,
 	.option_struct_size	= sizeof(struct ioring_options),
