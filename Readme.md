@@ -29,7 +29,6 @@ lat_percentiles=1
 iodepth=1
 rw=write
 numjobs=1
-size=4K
 offset_increment=1z
 io_limit=4K
 
@@ -38,7 +37,6 @@ stonewall
 rw=trim
 iodepth=1
 numjobs=1
-size=1z
 bs=2147483648
 finish=1
 
@@ -47,7 +45,6 @@ stonewall
 iodepth=1
 rw=write
 numjobs=1
-size=4K
 offset=1z
 offset_increment=1z
 io_limit=4K
@@ -59,7 +56,6 @@ iodepth=1
 numjobs=1
 bs=2147483648
 offset=1z
-size=1z
 finish=1
 ```
 
