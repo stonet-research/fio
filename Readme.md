@@ -8,6 +8,13 @@ It requires that a zone be open and written to (i.e., a 4KiB write before a fini
 **It requires that `thread=1` is used, and `io_uring_cmd` is set.**
 Also pay attention to the max active zones supported by the device, such that setting concurrent finish jobs not higher than this, as the zones must be opened with writes before.
 
+**NOTE** it also requires all zones to be reset before the run (otherwise the full zones will be ignored to avoid reset overheads in the benchmark.
+Run:
+
+```bash
+sudo nvme zns reset-zone /dev/nvme0n2 -a
+```
+
 Example job for running finish benchmark, with 1 write of 4K then 1 finishe on the first ZNS zones, then write the 2nd zone and finish this zone.
 Note, that each write and finish are configured as new jobs (with the only difference of the offset), such that not the same zone is finished every time (it will be reset between runs however!).
 It can also be configured to finish the same zone again by just specifying one set of `fill-prep` and `finish` jobs, and setting globally `loops=100` or any desired value.

@@ -551,10 +551,18 @@ static bool __zbd_write_zone_get(struct thread_data *td,
 				 struct fio_zone_info *z)
 {
 	struct zoned_block_device_info *zbdi = f->zbd_info;
+	struct ioring_options *o = td->eo;
 	uint32_t zone_idx = zbd_zone_idx(f, z);
 	bool res = true;
 
 	if (z->cond == ZBD_ZONE_COND_OFFLINE)
+		return false;
+
+	/* 
+	 * For finish benchmark we don't treat full zone as write targets, such that we
+	 * can finish more zones than the active zone limit
+	 */
+	if (!z->reset_zone && o->finish && zbd_zone_remainder(z) == 0)
 		return false;
 
 	/*
@@ -1799,6 +1807,10 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 	 * After completing full write finish the zone
 	 */
 	if (o->finish) {
+		z->reset_zone = false;
+		pthread_mutex_lock(&f->zbd_info->mutex);
+		zbd_write_zone_put(td, f, z);
+		pthread_mutex_unlock(&f->zbd_info->mutex);
 		dprint(FD_ZBD,
 				"%s: finish zone %d\n",
 				f->file_name, zbd_zone_idx(f, z));
@@ -1954,6 +1966,7 @@ enum io_u_action zbd_adjust_block(struct thread_data *td, struct io_u *io_u)
 {
 	struct fio_file *f = io_u->file;
 	struct zoned_block_device_info *zbdi = f->zbd_info;
+	struct ioring_options *o = td->eo;
 	struct fio_zone_info *zb, *zl, *orig_zb;
 	uint32_t orig_len = io_u->buflen;
 	uint64_t min_bs = td->o.min_bs[io_u->ddir];
@@ -2135,6 +2148,19 @@ retry:
 			    f->io_size * td->o.zrt.u.f &&
 			    zbd_dec_and_reset_write_cnt(td, f))
 				zb->reset_zone = 1;
+		}
+
+		if (zbd_zone_full(f, zb, min_bs) && o->finish && !zb->reset_zone) {
+			zone_unlock(zb);
+
+			/* Find the next write pointer zone */
+			do {
+				zb++;
+				if (zbd_zone_idx(f, zb) >= f->max_zone)
+					zb = zbd_get_zone(f, f->min_zone);
+			} while (!zb->has_wp);
+
+			zone_lock(td, f, zb);
 		}
 
 		/* Reset the zone pointer if necessary */
