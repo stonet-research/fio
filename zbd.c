@@ -1809,8 +1809,9 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 		 * We only use bw_bytes so we do not need so track all info.
 		 */
 		td->io_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
+		td->io_issue_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
 		td->bytes_done[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
-		td->rate_io_issue_bytes[DDIR_WRITE] = z->capacity - td->o.bs[DDIR_WRITE];
+		td->rate_io_issue_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
 		td->stat_io_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
 		td->this_io_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
 	}
