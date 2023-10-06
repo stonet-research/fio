@@ -1782,8 +1782,9 @@ unlock:
  */
 static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 {
-	const struct fio_file *f = io_u->file;
+	struct fio_file *f = io_u->file;
 	struct fio_zone_info *z;
+	struct ioring_options *o = td->eo;
 
 	assert(f->zbd_info);
 
@@ -1793,6 +1794,17 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 	dprint(FD_ZBD,
 	       "%s: terminate I/O (%lld, %llu) for zone %u\n",
 	       f->file_name, io_u->offset, io_u->buflen, zbd_zone_idx(f, z));
+
+	/*
+	 * After completing full write finish the zone
+	 */
+	if (o->finish) {
+		dprint(FD_ZBD,
+				"%s: finish zone %d\n",
+				f->file_name, zbd_zone_idx(f, z));
+		io_u_quiesce(td);
+		zbd_finish_zone(td, f, z);
+	}
 
 	zbd_end_zone_io(td, io_u, z);
 
@@ -2130,15 +2142,6 @@ retry:
 				io_u->file = f;
 			}
 
-			/*
-             * TODO: for our benchmark this would not be the case since writes are always to a different zone than the resets
-             *
-			 * Since previous write requests may have been submitted
-			 * asynchronously and since we will submit the zone
-			 * reset synchronously, wait until previously submitted
-			 * write requests have completed before issuing a
-			 * zone reset.
-			 */
 			io_u_quiesce(td);
 			zb->reset_zone = 0;
 			if (__zbd_reset_zone(td, f, zb) < 0)
@@ -2264,27 +2267,11 @@ int zbd_do_io_u_trim(struct thread_data *td, struct io_u *io_u)
 {
 	struct fio_file *f = io_u->file;
 	struct fio_zone_info *z;
-	struct ioring_options *o = td->eo;
 	int ret;
 
 	z = zbd_offset_to_zone(f, io_u->offset);
 	if (!z->has_wp)
 		return 0;
-
-	if (o->finish) {
-		zone_lock(td, f, z);
-		pthread_mutex_lock(&f->zbd_info->mutex);
-		zbd_write_zone_put(td, f, z);
-		pthread_mutex_unlock(&f->zbd_info->mutex);
-		dprint(FD_ZBD,
-				"%s: finish zone %d\n",
-				f->file_name, zbd_zone_idx(f, z));
-		io_u_quiesce(td);
-		zbd_finish_zone(td, f, z);
-		zone_unlock(z);
-
-		return io_u_completed;
-	}
 
 	if (io_u->offset != z->start) {
 		log_err("Trim offset not at zone start (%lld)\n",

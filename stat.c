@@ -1481,10 +1481,10 @@ static void add_ddir_status_json(struct thread_stat *ts,
 	dir_object = json_create_object();
 
     global = get_global_options();
-   if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM && is_finish_set(opt_list)) {
-        json_object_add_value_object(parent, "ZNS finish", dir_object);
+    if (ddir == DDIR_WRITE && is_finish_set(opt_list)) {
+        json_object_add_value_object(parent, "finish", dir_object);
         json_object_add_value_int(dir_object, "total_zone_resets", ts->nr_zone_resets);
-    } else  if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM) {
+    } else if (global->o.zone_mode == ZONE_MODE_ZBD && ddir == DDIR_TRIM) {
         json_object_add_value_object(parent, "ZNS Reset", dir_object);
         json_object_add_value_int(dir_object, "total_zone_resets", ts->nr_zone_resets);
     } else {
@@ -1750,10 +1750,10 @@ static struct json_object *show_thread_status_json(struct thread_stat *ts,
 	if (opt_list)
 		json_add_job_opts(root, "job options", opt_list);
 
-	add_ddir_status_json(ts, rs, DDIR_READ, root, NULL);
-	add_ddir_status_json(ts, rs, DDIR_WRITE, root, NULL);
+	add_ddir_status_json(ts, rs, DDIR_READ, root, opt_list);
+	add_ddir_status_json(ts, rs, DDIR_WRITE, root, opt_list);
     add_ddir_status_json(ts, rs, DDIR_TRIM, root, opt_list);
-	add_ddir_status_json(ts, rs, DDIR_SYNC, root, NULL);
+	add_ddir_status_json(ts, rs, DDIR_SYNC, root, opt_list);
 
 	if (ts->unified_rw_rep == UNIFIED_BOTH)
 		add_mixed_ddir_status_json(ts, rs, root);
