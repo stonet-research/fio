@@ -1804,6 +1804,11 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 				f->file_name, zbd_zone_idx(f, z));
 		io_u_quiesce(td);
 		zbd_finish_zone(td, f, z);
+		/* 
+		 * Hardcoded to only account for finish bytes written and remove the 4K write before.
+		 * We only use bw_bytes so we do not need so track all info.
+		 */
+		td->io_bytes[DDIR_WRITE] += z->capacity - td->o.bs[DDIR_WRITE];
 	}
 
 	zbd_end_zone_io(td, io_u, z);
