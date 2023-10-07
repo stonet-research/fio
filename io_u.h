@@ -111,7 +111,7 @@ struct io_u {
 	 * ZBD mode zbd_put_io callback: called in after completion of an I/O
 	 * or commit of an async I/O to unlock the I/O target zone.
 	 */
-	void (*zbd_put_io)(struct thread_data *td, const struct io_u *);
+	void (*zbd_put_io)(struct thread_data *td, struct io_u *);
 
 	/*
 	 * Callback for io completion

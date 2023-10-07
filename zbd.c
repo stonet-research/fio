@@ -350,15 +350,16 @@ static void zbd_write_zone_put(struct thread_data *td, const struct fio_file *f,
 			       struct fio_zone_info *z)
 {
 	uint32_t zi;
+	struct ioring_options *o = td->eo;
 
-	if (!z->write)
+	if (!o->finish && !z->write)
 		return;
 
 	for (zi = 0; zi < f->zbd_info->num_write_zones; zi++) {
 		if (zbd_get_zone(f, f->zbd_info->write_zones[zi]) == z)
 			break;
 	}
-	if (zi == f->zbd_info->num_write_zones)
+	if (!o->finish && zi == f->zbd_info->num_write_zones)
 		return;
 
 	dprint(FD_ZBD, "%s: removing zone %u from write zone array\n",
@@ -551,18 +552,10 @@ static bool __zbd_write_zone_get(struct thread_data *td,
 				 struct fio_zone_info *z)
 {
 	struct zoned_block_device_info *zbdi = f->zbd_info;
-	struct ioring_options *o = td->eo;
 	uint32_t zone_idx = zbd_zone_idx(f, z);
 	bool res = true;
 
 	if (z->cond == ZBD_ZONE_COND_OFFLINE)
-		return false;
-
-	/* 
-	 * For finish benchmark we don't treat full zone as write targets, such that we
-	 * can finish more zones than the active zone limit
-	 */
-	if (!z->reset_zone && o->finish && zbd_zone_remainder(z) == 0)
 		return false;
 
 	/*
@@ -1382,6 +1375,7 @@ void zbd_file_reset(struct thread_data *td, struct fio_file *f)
 {
 	struct fio_zone_info *zb, *ze;
 	bool verify_data_left = false;
+	struct ioring_options *o = td->eo;
 
 	if (!f->zbd_info || !td_write(td))
 		return;
@@ -1394,7 +1388,7 @@ void zbd_file_reset(struct thread_data *td, struct fio_file *f)
 	 * writing any data to avoid that a zone reset has to be issued while
 	 * writing data, which causes data loss.
 	 */
-	if (td->o.verify != VERIFY_NONE) {
+	if (td->o.verify != VERIFY_NONE || o->finish) {
 		verify_data_left = td->runstate == TD_VERIFYING ||
 			td->io_hist_len || td->verify_batch;
 		if (td->io_hist_len && td->o.verify_backlog)
@@ -1788,7 +1782,7 @@ unlock:
  * zbd_put_io - Unlock an I/O unit target zone lock
  * @io_u: I/O unit
  */
-static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
+static void zbd_put_io(struct thread_data *td, struct io_u *io_u)
 {
 	struct fio_file *f = io_u->file;
 	struct fio_zone_info *z;
@@ -1806,13 +1800,19 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 	/*
 	 * After completing full write finish the zone
 	 */
-	if (o->finish) {
-		z->reset_zone = false;
+	if (io_u->ddir == DDIR_WRITE && o->finish) {
+		pthread_mutex_lock(&f->zbd_info->mutex);
+		zbd_write_zone_put(td, f, z);
+		pthread_mutex_unlock(&f->zbd_info->mutex);
 		dprint(FD_ZBD,
 				"%s: finish zone %d\n",
 				f->file_name, zbd_zone_idx(f, z));
 		io_u_quiesce(td);
 		zbd_finish_zone(td, f, z);
+		
+		z->reset_zone = false;
+		z->write = false;
+
 		/* 
 		 * Hardcoded to only account for finish bytes written and remove the 4K write before.
 		 * We only use bw_bytes so we do not need so track all info.
