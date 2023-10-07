@@ -1808,9 +1808,6 @@ static void zbd_put_io(struct thread_data *td, const struct io_u *io_u)
 	 */
 	if (o->finish) {
 		z->reset_zone = false;
-		pthread_mutex_lock(&f->zbd_info->mutex);
-		zbd_write_zone_put(td, f, z);
-		pthread_mutex_unlock(&f->zbd_info->mutex);
 		dprint(FD_ZBD,
 				"%s: finish zone %d\n",
 				f->file_name, zbd_zone_idx(f, z));
