@@ -478,7 +478,11 @@ int fio_nvme_get_info(struct fio_file *f, __u64 *nlba, __u32 pi_act,
 	int fd, err;
 	__u32 format_idx, elbaf;
 
-	if (f->filetype != FIO_TYPE_CHAR) {
+	/*
+	 * For io_uring with finish workload on a block device we still want to pass this check, such that 
+	 * it does not require io_uring_cmd. But still fail if doing it on a regular file
+	 */
+	if (f->filetype != FIO_TYPE_BLOCK && f->filetype != FIO_TYPE_CHAR) {
 		log_err("ioengine io_uring_cmd only works with nvme ns "
 			"generic char devices (/dev/ngXnY)\n");
 		return 1;
@@ -834,7 +838,7 @@ int fio_nvme_finish_zone(struct thread_data *td, struct fio_file *f,
 		if (fd < 0)
 			return -errno;
 	}
-
+	
 	zslba = offset >> data->lba_shift;
 	nr_zones = (length + td->o.zone_size - 1) / td->o.zone_size;
 

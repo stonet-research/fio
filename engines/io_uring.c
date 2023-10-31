@@ -1348,6 +1348,34 @@ static int fio_ioring_cmd_close_file(struct thread_data *td,
 	return 0;
 }
 
+static int fio_ioring_get_file_size(struct thread_data *td,
+					struct fio_file *f)
+{
+	struct ioring_options *o = td->eo;
+
+	if (fio_file_size_known(f))
+		return 0;
+
+	if (o->finish) {
+		struct nvme_data *data = NULL;
+		__u64 nlba = 0;
+		int ret;
+
+		data = calloc(1, sizeof(struct nvme_data));
+		ret = fio_nvme_get_info(f, &nlba, o->pi_act, data);
+		if (ret) {
+			free(data);
+			return ret;
+		}
+
+		f->real_file_size = data->lba_size * nlba;
+
+		FILE_SET_ENG_DATA(f, data);
+	}
+	
+	return generic_get_file_size(td, f);
+}
+
 static int fio_ioring_cmd_get_file_size(struct thread_data *td,
 					struct fio_file *f)
 {
@@ -1356,7 +1384,7 @@ static int fio_ioring_cmd_get_file_size(struct thread_data *td,
 	if (fio_file_size_known(f))
 		return 0;
 
-	if (o->cmd_type == FIO_URING_CMD_NVME) {
+	if (o->finish || o->cmd_type == FIO_URING_CMD_NVME) {
 		struct nvme_data *data = NULL;
 		__u64 nlba = 0;
 		int ret;
@@ -1446,11 +1474,12 @@ static struct ioengine_ops ioengine_uring = {
 	.queue			= fio_ioring_queue,
 	.commit			= fio_ioring_commit,
 	.getevents		= fio_ioring_getevents,
+	.finish_zone    = fio_ioring_cmd_finish_zone,
 	.event			= fio_ioring_event,
 	.cleanup		= fio_ioring_cleanup,
 	.open_file		= fio_ioring_open_file,
 	.close_file		= fio_ioring_close_file,
-	.get_file_size		= generic_get_file_size,
+	.get_file_size		= fio_ioring_get_file_size,
 	.options		= options,
 	.option_struct_size	= sizeof(struct ioring_options),
 };
