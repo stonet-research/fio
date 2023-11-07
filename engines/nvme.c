@@ -7,6 +7,7 @@
 #include "nvme.h"
 #include "../crc/crc-t10dif.h"
 #include "../crc/crc64.h"
+#include "zbd.h"
 
 static inline __u64 get_slba(struct nvme_data *data, struct io_u *io_u)
 {
@@ -343,8 +344,7 @@ void fio_nvme_uring_cmd_trim_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 	dsm->slba = get_slba(data, io_u);
 	/* nlb is a 1-based value for deallocate */
 	dsm->nlb = get_nlb(data, io_u) + 1;
-#include "zbd.h"
-
+}
 
 /**
  * zbd_offset_to_zone_idx - convert an offset into a zone number
@@ -385,6 +385,7 @@ int fio_nvme_uring_cmd_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 		return 0;
 	case DDIR_APPEND:
         	cmd->opcode = nvme_zns_cmd_append;	
+			break;
 	default:
 		return -ENOTSUP;
 	}

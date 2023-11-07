@@ -91,6 +91,7 @@ struct ioring_options {
 	unsigned int registerfiles;
 	unsigned int sqpoll_thread;
 	unsigned int finish;
+	unsigned int zone_append;
 	unsigned int sqpoll_set;
 	unsigned int sqpoll_cpu;
 	unsigned int nonvectored;
@@ -103,7 +104,6 @@ struct ioring_options {
 	unsigned int apptag_mask;
 	unsigned int prchk;
 	char *pi_chk;
-	unsigned int zone_append;
 	enum uring_cmd_type cmd_type;
 };
 
@@ -287,13 +287,13 @@ static struct fio_option options[] = {
 	},
 	{
 		.name = "zone_append",
-                .lname = "ZNS zone append",
-                .type = FIO_OPT_BOOL,
-                .off1   = offsetof(struct ioring_options, zone_append),
-                .help   = "Use zone appends for ZNS",
-                .category = FIO_OPT_C_ENGINE,
-                .group  = FIO_OPT_G_IOURING,
-        },
+		.lname = "ZNS zone append",
+		.type = FIO_OPT_BOOL,
+		.off1   = offsetof(struct ioring_options, zone_append),
+		.help   = "Use zone appends for ZNS",
+		.category = FIO_OPT_C_ENGINE,
+		.group  = FIO_OPT_G_IOURING,
+	},
 	{
 		.name	= NULL,
 	},
