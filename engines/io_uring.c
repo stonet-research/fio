@@ -91,6 +91,7 @@ struct ioring_options {
 	unsigned int registerfiles;
 	unsigned int sqpoll_thread;
 	unsigned int sqpoll_set;
+    unsigned int zone_append;
 	unsigned int sqpoll_cpu;
 	unsigned int nonvectored;
 	unsigned int uncached;
@@ -274,6 +275,15 @@ static struct fio_option options[] = {
 		.category = FIO_OPT_C_ENGINE,
 		.group	= FIO_OPT_G_IOURING,
 	},
+    {
+	    .name = "zone_append",
+        .lname = "ZNS zone append",
+        .type = FIO_OPT_BOOL,
+        .off1   = offsetof(struct ioring_options, zone_append),
+        .help   = "Use zone appends for ZNS",
+        .category = FIO_OPT_C_ENGINE,
+        .group  = FIO_OPT_G_IOURING,
+    },
 	{
 		.name	= NULL,
 	},
@@ -422,6 +432,11 @@ static int fio_ioring_cmd_prep(struct thread_data *td, struct io_u *io_u)
 	}
 
 	cmd = (struct nvme_uring_cmd *)sqe->cmd;
+
+    if (o->zone_append && io_u->ddir == DDIR_WRITE) {
+        io_u->ddir = DDIR_APPEND;
+    }
+
 	return fio_nvme_uring_cmd_prep(cmd, io_u,
 			o->nonvectored ? NULL : &ld->iovecs[io_u->index],
 			&ld->dsm[io_u->index]);

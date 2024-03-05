@@ -2166,7 +2166,8 @@ retry:
 
 	case DDIR_SYNC:
 		/* fall-through */
-	case DDIR_DATASYNC:
+    case DDIR_APPEND:
+    case DDIR_DATASYNC:
 	case DDIR_SYNC_FILE_RANGE:
 	case DDIR_WAIT:
 	case DDIR_LAST:

@@ -7,6 +7,7 @@
 #include "nvme.h"
 #include "../crc/crc-t10dif.h"
 #include "../crc/crc64.h"
+#include "zbd.h"
 
 static inline __u64 get_slba(struct nvme_data *data, struct io_u *io_u)
 {
@@ -345,6 +346,25 @@ void fio_nvme_uring_cmd_trim_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 	dsm->nlb = get_nlb(data, io_u) + 1;
 }
 
+/**
+ * zbd_offset_to_zone_idx - convert an offset into a zone number
+    1  * @f: file pointer.
+    2  * @offset: offset in bytes. If this offset is in the first zone_size bytes
+    3  *      past the disk size then the index of the sentinel is returned.
+    4  */
+static unsigned int zbd_offset_to_zone_idx(const struct fio_file *f,
+                            uint64_t offset)
+{
+	uint32_t zone_idx;
+
+        if (f->zbd_info->zone_size_log2 > 0)
+            zone_idx = offset >> f->zbd_info->zone_size_log2;
+        else
+            zone_idx = offset / f->zbd_info->zone_size;
+ 	return min(zone_idx, f->zbd_info->nr_zones);
+}
+
+
 int fio_nvme_uring_cmd_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 			    struct iovec *iov, struct nvme_dsm_range *dsm)
 {
@@ -364,12 +384,23 @@ int fio_nvme_uring_cmd_prep(struct nvme_uring_cmd *cmd, struct io_u *io_u,
 	case DDIR_TRIM:
 		fio_nvme_uring_cmd_trim_prep(cmd, io_u, dsm);
 		return 0;
-	default:
+	case DDIR_APPEND:
+        cmd->opcode = nvme_zns_cmd_append;
+        break;
+    default:
 		return -ENOTSUP;
 	}
 
 	slba = get_slba(data, io_u);
 	nlb = get_nlb(data, io_u);
+
+    if (io_u->ddir == DDIR_APPEND) {
+        struct fio_file *f = io_u->file;
+		slba =  zbd_offset_to_zone_idx(f, io_u->offset) * f->zbd_info->zone_size;
+		slba >>= data->lba_shift;
+		io_u->ddir = DDIR_WRITE;
+    }
+
 
 	/* cdw10 and cdw11 represent starting lba */
 	cmd->cdw10 = slba & 0xffffffff;
